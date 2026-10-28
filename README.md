@@ -7,8 +7,33 @@ $client = new \IgniteContainers\Client('https://api.example.com', getenv('IGNITE
 $servers = $client->listServers(['limit' => 10]);
 ```
 
-Covers operators, nodes, templates, servers, files, backups, schedules, SFTP,
-databases, notifications, Caddy proxy routes, audit, metrics, health/readiness,
-OpenAPI and SSE log streaming.
+## Coverage
+
+First-class methods cover API keys, audit events, nodes and allocations,
+templates and signed feeds, servers and power/commands, files, backups,
+schedules, SFTP, databases, notifications, Caddy proxy routes, metrics,
+health/readiness, OpenAPI and SSE log streaming.
+
+```php
+$env = $client->getServerEnvironment($serverId);
+$audit = $client->listAuditEvents(100);
+$state = $client->getNodeState($nodeId);
+$routes = $client->listProxyRoutes();
+$client->reconcileProxy();
+$versions = $client->listTemplateVersions($templateId);
+$client->streamLogs($serverId, static function (string $line): void {
+    echo $line, "\n";
+}, 300);
+$metrics = $client->metrics();
+$health = $client->health();
+$ready = $client->ready();
+$openapi = $client->openapi();
+$docs = $client->docs();
+```
+
+The raw `request()` and `requestRaw()` methods remain available for future or
+agent-only endpoints.
+
+Repository: <https://github.com/ATT-IT-Cloud-Services/ignite-containers-client-php>
 
 License: AGPL-3.0-or-later. See `LICENSE`.
