@@ -36,4 +36,4 @@ agent-only endpoints.
 
 Repository: <https://github.com/ATT-IT-Cloud-Services/ignite-containers-client-php>
 
-License: AGPL-3.0-or-later. See `LICENSE`.
+License: ATT IT AS-IS Software License Agreement. See `LICENSE`.
