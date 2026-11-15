@@ -467,11 +467,17 @@ final class Client
         string $path,
         string $content,
         string $encoding = 'utf8',
+        ?string $etag = null,
     ): array {
+        $body = ['path' => $path, 'content' => $content, 'encoding' => $encoding];
+        if ($etag !== null) {
+            $body['etag'] = $etag;
+        }
+
         return $this->request(
             'PUT',
             '/api/v1/pods/' . rawurlencode($podId) . '/files/content',
-            ['path' => $path, 'content' => $content, 'encoding' => $encoding],
+            $body,
         );
     }
 
