@@ -41,3 +41,12 @@ agent-only endpoints.
 Repository: <https://github.com/ATT-IT-Cloud-Services/ignite-containers-client-php>
 
 License: ATT IT AS-IS Software License Agreement. See `LICENSE`.
+
+## Billing report
+
+```php
+$report = $client->billingReport('tenant', $tenantId, $fromMs, $toMs);
+foreach ($report['resource_groups'] as $group) {
+    echo $group['totals']['volumes']['provisioned_byte_seconds'];
+}
+```

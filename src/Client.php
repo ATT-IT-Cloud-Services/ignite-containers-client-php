@@ -2111,6 +2111,20 @@ final class Client
         );
     }
 
+    /** @return array<string, mixed> */
+    public function billingReport(string $scope, string $scopeId, int $fromMs, int $toMs): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/billing' . $this->query([
+                'scope' => $scope,
+                'scope_id' => $scopeId,
+                'from_ms' => $fromMs,
+                'to_ms' => $toMs,
+            ]),
+        );
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function listMeteringProfiles(): array
     {
