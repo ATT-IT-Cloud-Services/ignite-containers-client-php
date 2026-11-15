@@ -8,7 +8,7 @@ namespace IgniteContainers;
  * Minimal, dependency-free client for the Ignite Containers control plane.
  *
  *   $client = new \IgniteContainers\Client('https://games.example.com', getenv('IGNITE_CONTAINERS_API_KEY'));
- *   $servers = $client->listServers(['limit' => 10]);
+ *   $pods = $client->listPods(['limit' => 10]);
  *
  * All methods either return the decoded JSON (array) or throw ClientException.
  */
@@ -46,22 +46,26 @@ final class Client
 
     /**
      * @param list<string> $scopes
-     * @param list<string> $serverIds
+     * @param list<string> $podIds
      * @return array<string, mixed> The created key plus the one-time plaintext token.
      */
     public function createApiKey(
         string $name,
         array $scopes,
-        array $serverIds = [],
+        array $podIds = [],
         ?string $expiresAt = null,
+        array $limits = [],
     ): array {
         $body = [
             'name' => $name,
             'scopes' => array_values($scopes),
-            'server_ids' => array_values($serverIds),
+            'pod_ids' => array_values($podIds),
         ];
         if ($expiresAt !== null) {
             $body['expires_at'] = $expiresAt;
+        }
+        if ($limits !== []) {
+            $body['limits'] = $limits;
         }
 
         return $this->request('POST', '/api/v1/api-keys', $body);
@@ -161,11 +165,11 @@ final class Client
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function listServerDatabases(string $serverId): array
+    public function listPodDatabases(string $podId): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/databases',
+            '/api/v1/pods/' . rawurlencode($podId) . '/databases',
         )['databases'];
     }
 
@@ -173,20 +177,20 @@ final class Client
      * @param array{host_id?: string, remote?: string} $request
      * @return array<string, mixed> Includes the one-time plaintext password.
      */
-    public function createServerDatabase(string $serverId, array $request = []): array
+    public function createPodDatabase(string $podId, array $request = []): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/databases',
+            '/api/v1/pods/' . rawurlencode($podId) . '/databases',
             $request,
         );
     }
 
-    public function deleteServerDatabase(string $serverId, string $databaseId): void
+    public function deletePodDatabase(string $podId, string $databaseId): void
     {
         $this->request(
             'DELETE',
-            '/api/v1/servers/' . rawurlencode($serverId)
+            '/api/v1/pods/' . rawurlencode($podId)
                 . '/databases/' . rawurlencode($databaseId),
         );
     }
@@ -194,7 +198,7 @@ final class Client
     // ------------------------------------------------------------------ sftp
 
     /** @return array<string, mixed> Includes host, port and the one-time password. */
-    public function createSftpCredential(string $serverId, ?int $ttlSeconds = null): array
+    public function createSftpCredential(string $podId, ?int $ttlSeconds = null): array
     {
         $body = [];
         if ($ttlSeconds !== null) {
@@ -203,25 +207,25 @@ final class Client
 
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/sftp',
+            '/api/v1/pods/' . rawurlencode($podId) . '/sftp',
             $body,
         );
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function listSftpCredentials(string $serverId): array
+    public function listSftpCredentials(string $podId): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/sftp',
+            '/api/v1/pods/' . rawurlencode($podId) . '/sftp',
         )['credentials'];
     }
 
-    public function revokeSftpCredential(string $serverId, string $credentialId): void
+    public function revokeSftpCredential(string $podId, string $credentialId): void
     {
         $this->request(
             'DELETE',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/sftp/' . rawurlencode($credentialId),
+            '/api/v1/pods/' . rawurlencode($podId) . '/sftp/' . rawurlencode($credentialId),
         );
     }
 
@@ -268,25 +272,25 @@ final class Client
     // ------------------------------------------------------------------ bulk
 
     /**
-     * @param list<string> $serverIds
+     * @param list<string> $podIds
      * @return array<int, array<string, mixed>>
      */
-    public function bulkPower(array $serverIds, string $signal): array
+    public function bulkPower(array $podIds, string $signal): array
     {
-        return $this->request('POST', '/api/v1/servers/bulk/power', [
-            'server_ids' => array_values($serverIds),
+        return $this->request('POST', '/api/v1/pods/bulk/power', [
+            'pod_ids' => array_values($podIds),
             'signal' => $signal,
         ])['results'];
     }
 
     /**
-     * @param list<string> $serverIds
+     * @param list<string> $podIds
      * @return array<int, array<string, mixed>>
      */
-    public function bulkCommand(array $serverIds, string $command): array
+    public function bulkCommand(array $podIds, string $command): array
     {
-        return $this->request('POST', '/api/v1/servers/bulk/command', [
-            'server_ids' => array_values($serverIds),
+        return $this->request('POST', '/api/v1/pods/bulk/command', [
+            'pod_ids' => array_values($podIds),
             'command' => $command,
         ])['results'];
     }
@@ -294,16 +298,16 @@ final class Client
     // --------------------------------------------------------------- backups
 
     /** @return array<int, array<string, mixed>> */
-    public function listBackups(string $serverId): array
+    public function listBackups(string $podId): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/backups',
+            '/api/v1/pods/' . rawurlencode($podId) . '/backups',
         )['backups'];
     }
 
     /** @return array<string, mixed> */
-    public function createBackup(string $serverId, ?string $name = null): array
+    public function createBackup(string $podId, ?string $name = null): array
     {
         $body = [];
         if ($name !== null) {
@@ -312,48 +316,78 @@ final class Client
 
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/backups',
+            '/api/v1/pods/' . rawurlencode($podId) . '/backups',
             $body,
         );
     }
 
-    public function deleteBackup(string $serverId, string $backupId): void
+    public function deleteBackup(string $podId, string $backupId): void
     {
         $this->request(
             'DELETE',
-            '/api/v1/servers/' . rawurlencode($serverId)
+            '/api/v1/pods/' . rawurlencode($podId)
                 . '/backups/' . rawurlencode($backupId),
         );
     }
 
     /** @return array<string, mixed> */
-    public function restoreBackup(string $serverId, string $backupId): array
+    public function restoreBackup(string $podId, string $backupId): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId)
+            '/api/v1/pods/' . rawurlencode($podId)
                 . '/backups/' . rawurlencode($backupId) . '/restore',
             [],
         );
     }
 
     /** Returns raw gzip bytes. */
-    public function downloadBackup(string $serverId, string $backupId): string
+    public function downloadBackup(string $podId, string $backupId): string
     {
-        $url = '/api/v1/servers/' . rawurlencode($serverId)
+        $url = '/api/v1/pods/' . rawurlencode($podId)
             . '/backups/' . rawurlencode($backupId) . '/download';
 
         return $this->requestRaw('GET', $url);
     }
 
+    /** Returns raw gzip bytes of the data volume (or one subdirectory). */
+    public function downloadVolume(string $podId, ?string $path = null): string
+    {
+        return $this->requestRaw(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/volume/export'
+                . $this->query(['path' => $path]),
+        );
+    }
+
+    /**
+     * Uploads a gzip archive into the data volume (or one subdirectory).
+     *
+     * @return array<string, mixed>
+     */
+    public function importVolume(
+        string $podId,
+        string $contents,
+        ?string $path = null,
+        bool $wipe = true,
+    ): array {
+        return $this->requestBody(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/volume/import'
+                . $this->query(['path' => $path, 'wipe' => $wipe ? 'true' : 'false']),
+            $contents,
+            'application/gzip',
+        );
+    }
+
     // ------------------------------------------------------------- schedules
 
     /** @return array<int, array<string, mixed>> */
-    public function listSchedules(string $serverId): array
+    public function listSchedules(string $podId): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/schedules',
+            '/api/v1/pods/' . rawurlencode($podId) . '/schedules',
         )['schedules'];
     }
 
@@ -362,7 +396,7 @@ final class Client
      * @return array<string, mixed>
      */
     public function createSchedule(
-        string $serverId,
+        string $podId,
         string $name,
         string $cron,
         array $actions,
@@ -370,7 +404,7 @@ final class Client
     ): array {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/schedules',
+            '/api/v1/pods/' . rawurlencode($podId) . '/schedules',
             [
                 'name' => $name,
                 'cron' => $cron,
@@ -408,115 +442,115 @@ final class Client
     // ----------------------------------------------------------------- files
 
     /** @return array<string, mixed> */
-    public function listFiles(string $serverId, string $path = '/'): array
+    public function listFiles(string $podId, string $path = '/'): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files'
+            '/api/v1/pods/' . rawurlencode($podId) . '/files'
                 . $this->query(['path' => $path]),
         );
     }
 
     /** @return array<string, mixed> */
-    public function readFile(string $serverId, string $path): array
+    public function readFile(string $podId, string $path): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/content'
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/content'
                 . $this->query(['path' => $path]),
         );
     }
 
     /** @return array<string, mixed> */
     public function writeFile(
-        string $serverId,
+        string $podId,
         string $path,
         string $content,
         string $encoding = 'utf8',
     ): array {
         return $this->request(
             'PUT',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/content',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/content',
             ['path' => $path, 'content' => $content, 'encoding' => $encoding],
         );
     }
 
     /** @return array<string, mixed> */
-    public function makeDirectory(string $serverId, string $path): array
+    public function makeDirectory(string $podId, string $path): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/mkdir',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/mkdir',
             ['path' => $path],
         );
     }
 
     /** @return array<string, mixed> */
-    public function renameFile(string $serverId, string $from, string $to): array
+    public function renameFile(string $podId, string $from, string $to): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/rename',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/rename',
             ['from' => $from, 'to' => $to],
         );
     }
 
     /** @return array<string, mixed> */
-    public function chmodFile(string $serverId, string $path, string $mode): array
+    public function chmodFile(string $podId, string $path, string $mode): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/chmod',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/chmod',
             ['path' => $path, 'mode' => $mode],
         );
     }
 
     /** @return array<string, mixed> */
-    public function compressFile(string $serverId, string $path): array
+    public function compressFile(string $podId, string $path): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/compress',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/compress',
             ['path' => $path],
         );
     }
 
     /** @return array<string, mixed> */
-    public function decompressFile(string $serverId, string $path): array
+    public function decompressFile(string $podId, string $path): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files/decompress',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/decompress',
             ['path' => $path],
         );
     }
 
     /** @return array<string, mixed> */
-    public function deleteFile(string $serverId, string $path): array
+    public function deleteFile(string $podId, string $path): array
     {
         return $this->request(
             'DELETE',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/files'
+            '/api/v1/pods/' . rawurlencode($podId) . '/files'
                 . $this->query(['path' => $path]),
         );
     }
 
     /** @return array<string, mixed> */
-    public function suspendServer(string $serverId): array
+    public function suspendPod(string $podId): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/suspend',
+            '/api/v1/pods/' . rawurlencode($podId) . '/suspend',
             [],
         );
     }
 
     /** @return array<string, mixed> */
-    public function resumeServer(string $serverId): array
+    public function resumePod(string $podId): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/resume',
+            '/api/v1/pods/' . rawurlencode($podId) . '/resume',
             [],
         );
     }
@@ -524,11 +558,11 @@ final class Client
     // ----------------------------------------------------------- allocations
 
     /** @return array<int, array<string, mixed>> */
-    public function listAllocations(?string $nodeId = null, ?string $serverId = null): array
+    public function listAllocations(?string $nodeId = null, ?string $podId = null): array
     {
         $query = array_filter([
             'node_id' => $nodeId,
-            'server_id' => $serverId,
+            'pod_id' => $podId,
         ], static fn ($value) => $value !== null);
 
         return $this->request('GET', '/api/v1/allocations' . $this->query($query))['allocations'];
@@ -609,56 +643,56 @@ final class Client
         ]);
     }
 
-    // ---------------------------------------------------------------- servers
+    // ---------------------------------------------------------------- pods
 
     /**
      * @param array{node_id?: string, state?: string, external_ref?: string, name?: string, limit?: int, offset?: int} $query
      * @return array<int, array<string, mixed>>
      */
-    public function listServers(array $query = []): array
+    public function listPods(array $query = []): array
     {
-        return $this->request('GET', '/api/v1/servers' . $this->query($query))['servers'];
+        return $this->request('GET', '/api/v1/pods' . $this->query($query))['pods'];
     }
 
-    /** @param array<string, mixed> $server */
-    public function createServer(array $server): array
+    /** @param array<string, mixed> $pod */
+    public function createPod(array $pod): array
     {
-        return $this->request('POST', '/api/v1/servers', $server);
+        return $this->request('POST', '/api/v1/pods', $pod);
     }
 
-    public function getServer(string $id): array
+    public function getPod(string $id): array
     {
-        return $this->request('GET', '/api/v1/servers/' . rawurlencode($id));
+        return $this->request('GET', '/api/v1/pods/' . rawurlencode($id));
     }
 
     /** @param array<string, mixed> $patch */
-    public function updateServer(string $id, array $patch): array
+    public function updatePod(string $id, array $patch): array
     {
-        return $this->request('PATCH', '/api/v1/servers/' . rawurlencode($id), $patch);
+        return $this->request('PATCH', '/api/v1/pods/' . rawurlencode($id), $patch);
     }
 
-    public function deleteServer(string $id): void
+    public function deletePod(string $id): void
     {
-        $this->request('DELETE', '/api/v1/servers/' . rawurlencode($id));
+        $this->request('DELETE', '/api/v1/pods/' . rawurlencode($id));
     }
 
     /** @param "start"|"stop"|"restart"|"kill" $signal */
     public function power(string $id, string $signal): array
     {
-        return $this->request('POST', '/api/v1/servers/' . rawurlencode($id) . '/power', [
+        return $this->request('POST', '/api/v1/pods/' . rawurlencode($id) . '/power', [
             'signal' => $signal,
         ]);
     }
 
     public function command(string $id, string $command): array
     {
-        return $this->request('POST', '/api/v1/servers/' . rawurlencode($id) . '/command', [
+        return $this->request('POST', '/api/v1/pods/' . rawurlencode($id) . '/command', [
             'command' => $command,
         ]);
     }
 
     /**
-     * @return array{server_id: string, cursor: string, lines: list<string>, truncated: bool}
+     * @return array{pod_id: string, cursor: string, lines: list<string>, truncated: bool}
      */
     public function logs(string $id, int $lines = 200): array
     {
@@ -666,58 +700,58 @@ final class Client
 
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($id) . '/logs' . $this->query(['lines' => $lines]),
+            '/api/v1/pods/' . rawurlencode($id) . '/logs' . $this->query(['lines' => $lines]),
         );
     }
 
     /** @return array<string, mixed> */
     public function stats(string $id): array
     {
-        return $this->request('GET', '/api/v1/servers/' . rawurlencode($id) . '/stats');
+        return $this->request('GET', '/api/v1/pods/' . rawurlencode($id) . '/stats');
     }
 
     /** @param array<string, mixed> $limits */
     public function setLimits(string $id, array $limits): array
     {
-        return $this->updateServer($id, ['limits' => $limits]);
+        return $this->updatePod($id, ['limits' => $limits]);
     }
 
-    public function attachAllocation(string $serverId, string $allocationId): array
+    public function attachAllocation(string $podId, string $allocationId): array
     {
         return $this->request(
             'POST',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/allocations',
+            '/api/v1/pods/' . rawurlencode($podId) . '/allocations',
             ['allocation_id' => $allocationId],
         );
     }
 
-    public function detachAllocation(string $serverId, string $allocationId): void
+    public function detachAllocation(string $podId, string $allocationId): void
     {
         $this->request(
             'DELETE',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/allocations/' . rawurlencode($allocationId),
+            '/api/v1/pods/' . rawurlencode($podId) . '/allocations/' . rawurlencode($allocationId),
         );
     }
 
     public function reinstall(string $id): array
     {
-        return $this->request('POST', '/api/v1/servers/' . rawurlencode($id) . '/reinstall', []);
+        return $this->request('POST', '/api/v1/pods/' . rawurlencode($id) . '/reinstall', []);
     }
 
     /** @return array<int, array<string, mixed>> */
     public function listJobs(string $id): array
     {
-        return $this->request('GET', '/api/v1/servers/' . rawurlencode($id) . '/jobs')['jobs'];
+        return $this->request('GET', '/api/v1/pods/' . rawurlencode($id) . '/jobs')['jobs'];
     }
 
     // ------------------------------------------------- environment / audit
 
     /** @return array<string, string> */
-    public function getServerEnvironment(string $serverId): array
+    public function getPodEnvironment(string $podId): array
     {
         return $this->request(
             'GET',
-            '/api/v1/servers/' . rawurlencode($serverId) . '/environment',
+            '/api/v1/pods/' . rawurlencode($podId) . '/environment',
         )['environment'];
     }
 
@@ -766,6 +800,30 @@ final class Client
         return $this->request('POST', '/api/v1/proxy/reconcile', []);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function listProxyCertificates(): array
+    {
+        return $this->request('GET', '/api/v1/proxy/certificates')['certificates'];
+    }
+
+    /** @param array<string, mixed> $certificate */
+    public function uploadProxyCertificate(array $certificate): array
+    {
+        return $this->request('POST', '/api/v1/proxy/certificates', $certificate);
+    }
+
+    /** @return array<string, mixed> */
+    public function getProxyCertificate(string $id): array
+    {
+        return $this->request('GET', '/api/v1/proxy/certificates/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function deleteProxyCertificate(string $id): array
+    {
+        return $this->request('DELETE', '/api/v1/proxy/certificates/' . rawurlencode($id));
+    }
+
     // -------------------------------------------------------------- node state
 
     /** @return array<string, mixed> */
@@ -801,16 +859,1274 @@ final class Client
         );
     }
 
+    // -------------------------------------------------------------- fabric
+
+    /** @return array<int, array<string, mixed>> */
+    public function listVnets(): array
+    {
+        return $this->request('GET', '/api/v1/vnets')['vnets'];
+    }
+
+    /** @param array<string, mixed> $vnet */
+    public function createVnet(array $vnet): array
+    {
+        return $this->request('POST', '/api/v1/vnets', $vnet);
+    }
+
+    public function deleteVnet(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/vnets/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listVnetAttachments(string $id): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/vnets/' . rawurlencode($id) . '/attachments',
+        )['attachments'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function attachVnet(string $id, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/vnets/' . rawurlencode($id) . '/attachments',
+            $request,
+        );
+    }
+
+    public function detachVnet(string $id, string $podId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/vnets/' . rawurlencode($id) . '/attachments/' . rawurlencode($podId),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listInterconnects(): array
+    {
+        return $this->request('GET', '/api/v1/interconnects')['interconnects'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createInterconnect(array $request): array
+    {
+        return $this->request('POST', '/api/v1/interconnects', $request);
+    }
+
+    public function deleteInterconnect(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/interconnects/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listListeners(): array
+    {
+        return $this->request('GET', '/api/v1/proxy/listeners')['listeners'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createListener(array $request): array
+    {
+        return $this->request('POST', '/api/v1/proxy/listeners', $request);
+    }
+
+    public function deleteListener(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/proxy/listeners/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listListenerRoutes(string $id): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/proxy/listeners/' . rawurlencode($id) . '/routes',
+        )['routes'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createListenerRoute(string $id, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/proxy/listeners/' . rawurlencode($id) . '/routes',
+            $request,
+        );
+    }
+
+    public function deleteListenerRoute(string $id, string $routeId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/proxy/listeners/' . rawurlencode($id) . '/routes/' . rawurlencode($routeId),
+        );
+    }
+
+    /** @return array<string, mixed> builtin and custom adapters */
+    public function listProxyAdapters(): array
+    {
+        return $this->request('GET', '/api/v1/proxy/adapters');
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createProxyAdapter(array $request): array
+    {
+        return $this->request('POST', '/api/v1/proxy/adapters', $request);
+    }
+
+    public function deleteProxyAdapter(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/proxy/adapters/' . rawurlencode($id));
+    }
+
+    // ------------------------------------------------------- template export
+
+    /** @param array<string, mixed> $request */
+    public function exportTemplate(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/export-template',
+            $request,
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    public function cloneTemplate(string $templateId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/templates/' . rawurlencode($templateId) . '/clone',
+            $request,
+        );
+    }
+
+    // ------------------------------------------------- deployment classes
+
+    /** @return array<int, array<string, mixed>> */
+    public function listDeploymentClasses(): array
+    {
+        return $this->request('GET', '/api/v1/deployment-classes')['groups'];
+    }
+
+    /** @param array<string, mixed> $group */
+    public function createDeploymentClass(array $group): array
+    {
+        return $this->request('POST', '/api/v1/deployment-classes', $group);
+    }
+
+    /** @param array<string, mixed> $patch */
+    public function updateDeploymentClass(string $id, array $patch): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/deployment-classes/' . rawurlencode($id),
+            $patch,
+        );
+    }
+
+    public function deleteDeploymentClass(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/deployment-classes/' . rawurlencode($id));
+    }
+
+    // ------------------------------------------------------- runtime groups
+
+    /** @return array<int, array<string, mixed>> */
+    public function listRuntimeGroups(): array
+    {
+        return $this->request('GET', '/api/v1/runtime-groups')['groups'];
+    }
+
+    /** @param array<string, mixed> $group */
+    public function createRuntimeGroup(array $group): array
+    {
+        return $this->request('POST', '/api/v1/runtime-groups', $group);
+    }
+
+    /** @param array<string, mixed> $patch */
+    public function updateRuntimeGroup(string $id, array $patch): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/runtime-groups/' . rawurlencode($id),
+            $patch,
+        );
+    }
+
+    public function deleteRuntimeGroup(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/runtime-groups/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function runtimeGroupUsage(string $id, string $from, string $to): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/runtime-groups/' . rawurlencode($id) . '/usage'
+                . $this->query(['from' => $from, 'to' => $to]),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function podConfirmation(string $podId, ?int $waitSeconds = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/confirmation'
+                . $this->query(['wait_seconds' => $waitSeconds]),
+        );
+    }
+
+    // ------------------------------------------------------------- addresses
+
+    /** @param array<string, scalar|null> $query node_id, pod_id
+     *  @return array<int, array<string, mixed>> */
+    public function listIps(array $query = []): array
+    {
+        return $this->request('GET', '/api/v1/ips' . $this->query($query))['addresses'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createIp(array $request): array
+    {
+        return $this->request('POST', '/api/v1/ips', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getIp(string $id): array
+    {
+        return $this->request('GET', '/api/v1/ips/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateIp(string $id, array $request): array
+    {
+        return $this->request('PATCH', '/api/v1/ips/' . rawurlencode($id), $request);
+    }
+
+    public function deleteIp(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/ips/' . rawurlencode($id));
+    }
+
+    /** @param array<string, scalar|null> $query node_id, pod_id
+     *  @return array<int, array<string, mixed>> */
+    public function listForwards(array $query = []): array
+    {
+        return $this->request('GET', '/api/v1/forwards' . $this->query($query))['forwards'];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPodIps(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ips',
+        )['addresses'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function bindPodIp(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ips',
+            $request,
+        );
+    }
+
+    public function unbindPodIp(string $podId, string $ipId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ips/' . rawurlencode($ipId),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPodForwards(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/forwards',
+        )['forwards'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createPodForward(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/forwards',
+            $request,
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updatePodForward(string $podId, string $forwardId, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/forwards/' . rawurlencode($forwardId),
+            $request,
+        );
+    }
+
+    public function deletePodForward(string $podId, string $forwardId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/forwards/' . rawurlencode($forwardId),
+        );
+    }
+
+    // -------------------------------------------------------------- platform
+
+    /** @return array<string, mixed> */
+    public function getPlatform(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/platform',
+        );
+    }
+
+    /** @param array<string, mixed> $spec */
+    public function putPlatform(string $podId, array $spec): array
+    {
+        return $this->request(
+            'PUT',
+            '/api/v1/pods/' . rawurlencode($podId) . '/platform',
+            $spec,
+        );
+    }
+
+    // ---------------------------------------------------- autonomous updates
+
+    /** @return array<string, mixed> */
+    public function getUpdatePolicy(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/update-policy',
+        );
+    }
+
+    /** @param array<string, mixed> $policy */
+    public function putUpdatePolicy(string $podId, array $policy): array
+    {
+        return $this->request(
+            'PUT',
+            '/api/v1/pods/' . rawurlencode($podId) . '/update-policy',
+            $policy,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function checkPodUpdates(string $podId): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/updates/check',
+            [],
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listRevisions(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/revisions',
+        )['revisions'];
+    }
+
+    public function deleteRevision(string $podId, string $revisionId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/revisions/' . rawurlencode($revisionId),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function pinRevision(string $podId, string $revisionId, bool $pinned = true): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/revisions/' . rawurlencode($revisionId) . '/pin',
+            ['pinned' => $pinned],
+        );
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getRollout(string $podId): ?array
+    {
+        $status = $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/rollout',
+        );
+        return $status['rollout'] ?? null;
+    }
+
+    // -------------------------------------------------------------- metering
+
+    /** @return array<string, mixed> */
+    public function getMeterView(string $scope, ?string $scopeId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/metering' . $this->query(['scope' => $scope, 'scope_id' => $scopeId]),
+        );
+    }
+
+    /** @param array<string, mixed> $request scope, scope_id, unit */
+    public function setMeterView(array $request): array
+    {
+        return $this->request('PUT', '/api/v1/metering', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function podUsage(string $podId, string $from, string $to): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/usage'
+                . $this->query(['from' => $from, 'to' => $to]),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function podUsageSamples(string $podId, string $from, string $to): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/usage/samples'
+                . $this->query(['from' => $from, 'to' => $to]),
+        )['samples'];
+    }
+
+    // -------------------------------------------------------- jobs and transfer
+
+    /** @param array<string, scalar|null> $query status, limit
+     *  @return array<int, array<string, mixed>> */
+    public function listAllJobs(array $query = []): array
+    {
+        return $this->request('GET', '/api/v1/jobs' . $this->query($query))['jobs'];
+    }
+
+    /** @return array<string, mixed> */
+    public function getJob(string $id): array
+    {
+        return $this->request('GET', '/api/v1/jobs/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function retryJob(string $id): array
+    {
+        return $this->request('POST', '/api/v1/jobs/' . rawurlencode($id) . '/retry', []);
+    }
+
+    /** @param array<string, mixed> $request node_id, mode, drain_seconds */
+    public function transferPod(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/transfer',
+            $request,
+        );
+    }
+
+    // -------------------------------------------------------------- webhooks
+
+    /** @return array<int, array<string, mixed>> */
+    public function listWebhooks(): array
+    {
+        return $this->request('GET', '/api/v1/webhooks')['webhooks'];
+    }
+
+    /** @param array<string, mixed> $request url, events, description, enabled */
+    public function createWebhook(array $request): array
+    {
+        return $this->request('POST', '/api/v1/webhooks', $request);
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateWebhook(string $id, array $request): array
+    {
+        return $this->request('PATCH', '/api/v1/webhooks/' . rawurlencode($id), $request);
+    }
+
+    public function deleteWebhook(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/webhooks/' . rawurlencode($id));
+    }
+
+    public function rotateWebhookSecret(string $id): string
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/webhooks/' . rawurlencode($id) . '/rotate-secret',
+            [],
+        )['secret'];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listWebhookDeliveries(string $id): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/webhooks/' . rawurlencode($id) . '/deliveries',
+        )['deliveries'];
+    }
+
+    // ---------------------------------------------------------- template nests
+
+    /** @param array<string, mixed> $request nest, version, channel, save */
+    public function importNest(array $request): array
+    {
+        return $this->request('POST', '/api/v1/templates/nests', $request);
+    }
+
+    // --------------------------------------------------------- files and limits
+
+    public function downloadFile(string $podId, string $path): string
+    {
+        return $this->requestRaw(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/download'
+                . $this->query(['path' => $path]),
+            'application/octet-stream',
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function uploadFile(string $podId, string $path, string $contents): array
+    {
+        return $this->requestBody(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/files/upload'
+                . $this->query(['path' => $path]),
+            $contents,
+            'application/octet-stream',
+        );
+    }
+
+    /** @param array<string, mixed> $limits */
+    public function updateLimits(string $podId, array $limits): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/pods/' . rawurlencode($podId) . '/limits',
+            ['limits' => $limits],
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    public function deployCompose(array $request): array
+    {
+        return $this->request('POST', '/api/v1/compose/deploy', $request);
+    }
+
+    // ----------------------------------------------------------- storage
+
+    /** @return array<int, array<string, mixed>> */
+    public function listStorageBackends(?string $tenantId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/storage/backends'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+        )['backends'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createStorageBackend(array $request): array
+    {
+        return $this->request('POST', '/api/v1/storage/backends', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getStorageBackend(string $id): array
+    {
+        return $this->request('GET', '/api/v1/storage/backends/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateStorageBackend(string $id, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/storage/backends/' . rawurlencode($id),
+            $request,
+        );
+    }
+
+    public function deleteStorageBackend(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/storage/backends/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listVolumes(?string $resourceGroupId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/storage/volumes'
+                . $this->query(
+                    $resourceGroupId === null ? [] : ['resource_group_id' => $resourceGroupId],
+                ),
+        )['volumes'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createVolume(array $request): array
+    {
+        return $this->request('POST', '/api/v1/storage/volumes', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getVolume(string $id): array
+    {
+        return $this->request('GET', '/api/v1/storage/volumes/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateVolume(string $id, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/storage/volumes/' . rawurlencode($id),
+            $request,
+        );
+    }
+
+    public function deleteVolume(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/storage/volumes/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listStorageGatewayTokens(string $tenantId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/storage/gateway-tokens' . $this->query(['tenant_id' => $tenantId]),
+        )['tokens'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createStorageGatewayToken(array $request): array
+    {
+        return $this->request('POST', '/api/v1/storage/gateway-tokens', $request);
+    }
+
+    public function revokeStorageGatewayToken(string $id, string $tenantId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/storage/gateway-tokens/' . rawurlencode($id)
+                . $this->query(['tenant_id' => $tenantId]),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function reportVolumeUsage(string $id, int $usedBytes): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/storage/volumes/' . rawurlencode($id) . '/usage',
+            ['used_bytes' => $usedBytes],
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPodVolumes(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/volumes',
+        )['mounts'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function mountVolume(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/volumes',
+            $request,
+        );
+    }
+
+    public function unmountVolume(string $podId, string $mountId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/volumes/' . rawurlencode($mountId),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listExternalDatabases(?string $tenantId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/external-databases'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+        )['databases'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createExternalDatabase(array $request): array
+    {
+        return $this->request('POST', '/api/v1/external-databases', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getExternalDatabase(string $id): array
+    {
+        return $this->request('GET', '/api/v1/external-databases/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateExternalDatabase(string $id, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/external-databases/' . rawurlencode($id),
+            $request,
+        );
+    }
+
+    public function deleteExternalDatabase(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/external-databases/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function testExternalDatabase(string $id): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/external-databases/' . rawurlencode($id) . '/test',
+            [],
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPodExternalDatabases(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/external-databases',
+        )['bindings'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function bindPodExternalDatabase(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/external-databases',
+            $request,
+        );
+    }
+
+    public function unbindPodExternalDatabase(string $podId, string $bindingId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/external-databases/' . rawurlencode($bindingId),
+        );
+    }
+
+    // ----------------------------------------------------- metrics storage
+
+    /** @return array<string, mixed> */
+    public function getMetricsStoragePolicy(?string $tenantId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/metrics/storage-policy'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+        );
+    }
+
+    /** @param array<string, mixed> $policy */
+    public function putMetricsStoragePolicy(array $policy, ?string $tenantId = null): array
+    {
+        return $this->request(
+            'PUT',
+            '/api/v1/metrics/storage-policy'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+            $policy,
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listMetricsArchives(?string $tenantId = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/metrics/archive'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+        )['archives'];
+    }
+
+    /** @return array<string, mixed> */
+    public function archiveMetrics(?string $tenantId = null): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/metrics/archive-now'
+                . $this->query($tenantId === null ? [] : ['tenant_id' => $tenantId]),
+            [],
+        );
+    }
+
+    // --------------------------------------------------------------- git
+
+    /** @return array<int, array<string, mixed>> */
+    public function listGitCredentials(): array
+    {
+        return $this->request('GET', '/api/v1/git/credentials');
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createGitCredential(array $request): array
+    {
+        return $this->request('POST', '/api/v1/git/credentials', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getGitCredential(string $id): array
+    {
+        return $this->request('GET', '/api/v1/git/credentials/' . rawurlencode($id));
+    }
+
+    public function deleteGitCredential(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/git/credentials/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listGitSources(): array
+    {
+        return $this->request('GET', '/api/v1/git/sources');
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createGitSource(array $request): array
+    {
+        return $this->request('POST', '/api/v1/git/sources', $request);
+    }
+
+    /** @return array<string, mixed> */
+    public function getGitSource(string $id): array
+    {
+        return $this->request('GET', '/api/v1/git/sources/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateGitSource(string $id, array $request): array
+    {
+        return $this->request('PATCH', '/api/v1/git/sources/' . rawurlencode($id), $request);
+    }
+
+    public function deleteGitSource(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/git/sources/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function triggerGitBuild(string $id, ?string $reference = null): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/git/sources/' . rawurlencode($id) . '/build',
+            $reference === null ? [] : ['reference' => $reference],
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listGitBuilds(): array
+    {
+        return $this->request('GET', '/api/v1/git/builds')['builds'];
+    }
+
+    /** @return array<string, mixed> */
+    public function getGitBuild(string $id): array
+    {
+        return $this->request('GET', '/api/v1/git/builds/' . rawurlencode($id));
+    }
+
+    // ------------------------------------------------------------- images
+
+    /** @return array<int, array<string, mixed>> */
+    public function listImages(): array
+    {
+        return $this->request('GET', '/api/v1/images')['images'];
+    }
+
+    /** @return array<string, mixed> */
+    public function getImage(string $id): array
+    {
+        return $this->request('GET', '/api/v1/images/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function imageCopies(string $id): array
+    {
+        return $this->request('GET', '/api/v1/images/' . rawurlencode($id) . '/copies');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function imagePulls(string $id): array
+    {
+        return $this->request('GET', '/api/v1/images/' . rawurlencode($id) . '/pulls');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function imageUsage(): array
+    {
+        return $this->request('GET', '/api/v1/images/usage');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function allImagePulls(): array
+    {
+        return $this->request('GET', '/api/v1/images/pulls');
+    }
+
+    /** @param array<string, mixed> $request */
+    public function pullImage(array $request): array
+    {
+        return $this->request('POST', '/api/v1/images/pull', $request);
+    }
+
+    /** @param array<string, mixed> $request */
+    public function uploadImage(array $request): array
+    {
+        return $this->request('POST', '/api/v1/images/upload', $request);
+    }
+
+    public function deleteImage(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/images/' . rawurlencode($id));
+    }
+
+    // ------------------------------------------------- pod port bindings
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPodPorts(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ports',
+        )['ports'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createPodPort(string $podId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ports',
+            $request,
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updatePodPort(string $podId, string $portId, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ports/' . rawurlencode($portId),
+            $request,
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function podPortHistory(string $podId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ports/history',
+        )['events'];
+    }
+
+    public function deletePodPort(string $podId, string $portId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/pods/' . rawurlencode($podId) . '/ports/' . rawurlencode($portId),
+        );
+    }
+
+    // ------------------------------------------------------ compose
+
+    /** @return array<string, mixed> */
+    public function convertCompose(string $yaml): array
+    {
+        return $this->requestBody(
+            'POST',
+            '/api/v1/compose/convert',
+            $yaml,
+            'application/yaml',
+        );
+    }
+
+    // --------------------------------------------------- TOML templates
+
+    /** @return array<string, mixed> */
+    public function importTemplateToml(string $toml): array
+    {
+        return $this->requestBody(
+            'POST',
+            '/api/v1/templates/import?save=true',
+            $toml,
+            'application/toml',
+        );
+    }
+
+    public function exportTemplateToml(string $id): string
+    {
+        return $this->requestRaw(
+            'GET',
+            '/api/v1/templates/' . rawurlencode($id) . '/export?format=toml',
+            'application/toml',
+        );
+    }
+
+    // ---------------------------------------------------- tenants and RGs
+
+    /** @return array<int, array<string, mixed>> */
+    public function listTenants(): array
+    {
+        return $this->request('GET', '/api/v1/tenants');
+    }
+
+    /** @param array<string, mixed> $tenant */
+    public function createTenant(array $tenant): array
+    {
+        return $this->request('POST', '/api/v1/tenants', $tenant);
+    }
+
+    /** @return array<string, mixed> */
+    public function getTenant(string $id): array
+    {
+        return $this->request('GET', '/api/v1/tenants/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $patch */
+    public function updateTenant(string $id, array $patch): array
+    {
+        return $this->request('PATCH', '/api/v1/tenants/' . rawurlencode($id), $patch);
+    }
+
+    /** @return array<int, string> */
+    public function listTenantAccess(string $tenantId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/tenants/' . rawurlencode($tenantId) . '/access',
+        )['api_key_ids'];
+    }
+
+    /** @return array<int, string> */
+    public function grantTenantAccess(string $tenantId, string $apiKeyId): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/tenants/' . rawurlencode($tenantId) . '/access',
+            ['api_key_id' => $apiKeyId],
+        )['api_key_ids'];
+    }
+
+    public function revokeTenantAccess(string $tenantId, string $keyId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/tenants/' . rawurlencode($tenantId)
+                . '/access/' . rawurlencode($keyId),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listTenantResourceGroups(string $tenantId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/tenants/' . rawurlencode($tenantId) . '/resource-groups',
+        );
+    }
+
+    /** @param array<string, mixed> $group */
+    public function createResourceGroup(string $tenantId, array $group): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/tenants/' . rawurlencode($tenantId) . '/resource-groups',
+            $group,
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listResourceGroups(): array
+    {
+        return $this->request('GET', '/api/v1/resource-groups');
+    }
+
+    /** @return array<string, mixed> */
+    public function getResourceGroup(string $id): array
+    {
+        return $this->request('GET', '/api/v1/resource-groups/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $patch */
+    public function updateResourceGroup(string $id, array $patch): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/resource-groups/' . rawurlencode($id),
+            $patch,
+        );
+    }
+
+    public function deleteResourceGroup(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/resource-groups/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function getReference(string $referenceId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/references/' . rawurlencode($referenceId),
+        );
+    }
+
+    // ---------------------------------------------------------- transfers
+
+    /** @param array<string, mixed> $request tenant_id, label */
+    public function createTransferKey(array $request): array
+    {
+        return $this->request('POST', '/api/v1/transfer-keys', $request);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listTransferKeys(string $tenantId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/transfer-keys' . $this->query(['tenant_id' => $tenantId]),
+        );
+    }
+
+    public function revokeTransferKey(string $id, string $tenantId): void
+    {
+        $this->request(
+            'DELETE',
+            '/api/v1/transfer-keys/' . rawurlencode($id)
+                . $this->query(['tenant_id' => $tenantId]),
+        );
+    }
+
+    /** @param array<string, mixed> $request transfer_key, idempotency_key */
+    public function startTransfer(string $resourceGroupId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/resource-groups/' . rawurlencode($resourceGroupId) . '/transfer',
+            $request,
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listTransfers(string $resourceGroupId): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/resource-groups/' . rawurlencode($resourceGroupId) . '/transfers',
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function getTransfer(string $id): array
+    {
+        return $this->request('GET', '/api/v1/transfers/' . rawurlencode($id));
+    }
+
+    /** @return array<string, mixed> */
+    public function cancelTransfer(string $id): array
+    {
+        return $this->request('POST', '/api/v1/transfers/' . rawurlencode($id) . '/cancel', []);
+    }
+
+    /** @return array<string, mixed> */
+    public function dismissTransfer(string $id): array
+    {
+        return $this->request('POST', '/api/v1/transfers/' . rawurlencode($id) . '/dismiss', []);
+    }
+
+    // ------------------------------------------------- usage and profiles
+
+    /** @return array<string, mixed> */
+    public function usage(
+        string $scope,
+        string $scopeId,
+        string $window,
+        string $unit = 'times',
+        bool $includeExact = false,
+    ): array {
+        return $this->request(
+            'GET',
+            '/api/v1/usage' . $this->query([
+                'scope' => $scope,
+                'scope_id' => $scopeId,
+                'window' => $window,
+                'unit' => $unit,
+                'include_exact' => $includeExact ? 'true' : 'false',
+            ]),
+        );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listMeteringProfiles(): array
+    {
+        return $this->request('GET', '/api/v1/metering/profiles');
+    }
+
+    /** @param array<string, mixed> $profile */
+    public function createMeteringProfile(array $profile): array
+    {
+        return $this->request('POST', '/api/v1/metering/profiles', $profile);
+    }
+
     /**
-     * Stream `GET /servers/{id}/logs/stream` (SSE) and call `$onLine` for each
+     * Stream `GET /pods/{id}/logs/stream` (SSE) and call `$onLine` for each
      * `data:` line. `$maxSeconds = 0` disables the timeout.
      *
      * @param callable(string):void $onLine
      */
-    public function streamLogs(string $serverId, callable $onLine, int $maxSeconds = 300): void
+    public function streamLogs(string $podId, callable $onLine, int $maxSeconds = 300): void
     {
         $handle = curl_init(
-            $this->baseUrl . '/api/v1/servers/' . rawurlencode($serverId) . '/logs/stream'
+            $this->baseUrl . '/api/v1/pods/' . rawurlencode($podId) . '/logs/stream'
         );
         if ($handle === false) {
             throw new \RuntimeException('could not initialise cURL');
@@ -959,9 +2275,13 @@ final class Client
     }
 
     /**
-     * Requests a binary response (backup download).
+     * Requests a binary response (backup or file download).
      */
-    public function requestRaw(string $method, string $path): string
+    public function requestRaw(
+        string $method,
+        string $path,
+        string $accept = 'application/gzip',
+    ): string
     {
         $handle = curl_init($this->baseUrl . $path);
         if ($handle === false) {
@@ -972,7 +2292,7 @@ final class Client
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $this->apiKey,
-                'Accept: application/gzip',
+                'Accept: ' . $accept,
             ],
             CURLOPT_TIMEOUT => 600,
             CURLOPT_CONNECTTIMEOUT => $this->connectTimeout,
@@ -1001,6 +2321,66 @@ final class Client
         }
 
         return $raw;
+    }
+
+    /**
+     * Sends a raw request body and returns the decoded JSON response.
+     *
+     * @return array<string, mixed>
+     */
+    private function requestBody(
+        string $method,
+        string $path,
+        string $body,
+        string $contentType,
+    ): array {
+        $handle = curl_init($this->baseUrl . $path);
+        if ($handle === false) {
+            throw new \RuntimeException('could not initialise cURL');
+        }
+        curl_setopt_array($handle, [
+            CURLOPT_CUSTOMREQUEST => strtoupper($method),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->apiKey,
+                'Accept: application/json',
+                'Content-Type: ' . $contentType,
+            ],
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_TIMEOUT => max($this->timeout, 600),
+            CURLOPT_CONNECTTIMEOUT => $this->connectTimeout,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        ]);
+
+        $raw = curl_exec($handle);
+        if ($raw === false) {
+            $error = curl_error($handle);
+            curl_close($handle);
+            throw new \RuntimeException('transport error: ' . $error);
+        }
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            $data = ['raw' => $raw];
+        }
+        if ($status < 200 || $status >= 300) {
+            $error = $data['error'] ?? [];
+            throw new ClientException(
+                $status,
+                is_string($error['code'] ?? null) ? $error['code'] : 'unknown',
+                is_string($error['message'] ?? null)
+                    ? $error['message']
+                    : sprintf('HTTP %d', $status),
+                is_array($error['details'] ?? null) ? $error['details'] : null,
+            );
+        }
+
+        return $data;
     }
 
     /** @param array<string, scalar|null> $query */

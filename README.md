@@ -4,24 +4,28 @@ Dependency-free PHP client for the Ignite Containers control plane API.
 
 ```php
 $client = new \IgniteContainers\Client('https://api.example.com', getenv('IGNITE_CONTAINERS_API_KEY'));
-$servers = $client->listServers(['limit' => 10]);
+$pods = $client->listPods(['limit' => 10]);
 ```
 
 ## Coverage
 
 First-class methods cover API keys, audit events, nodes and allocations,
-templates and signed feeds, servers and power/commands, files, backups,
-schedules, SFTP, databases, notifications, Caddy proxy routes, metrics,
+runtime groups, floating IPs and port forwards, templates and signed feeds,
+template nests and export/clone, pods and power/commands, provision
+confirmation, platform settings, autonomous update policy/revisions/rollouts,
+metering and usage, files including streaming upload/download, backups,
+schedules, SFTP, jobs and transfers, webhooks, databases, notifications, Caddy
+proxy routes, proxy adapters, VNets/interconnects/listeners, metrics,
 health/readiness, OpenAPI and SSE log streaming.
 
 ```php
-$env = $client->getServerEnvironment($serverId);
+$env = $client->getPodEnvironment($podId);
 $audit = $client->listAuditEvents(100);
 $state = $client->getNodeState($nodeId);
 $routes = $client->listProxyRoutes();
 $client->reconcileProxy();
 $versions = $client->listTemplateVersions($templateId);
-$client->streamLogs($serverId, static function (string $line): void {
+$client->streamLogs($podId, static function (string $line): void {
     echo $line, "\n";
 }, 300);
 $metrics = $client->metrics();
