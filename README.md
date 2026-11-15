@@ -50,3 +50,11 @@ foreach ($report['resource_groups'] as $group) {
     echo $group['totals']['volumes']['provisioned_byte_seconds'];
 }
 ```
+
+## Build measurements
+
+```php
+$live = $client->buildUsage($buildId);
+$samples = $client->buildUsageSamples($buildId);
+echo $live['usage']['cpu_millis'];
+```

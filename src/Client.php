@@ -1779,6 +1779,26 @@ final class Client
         return $this->request('GET', '/api/v1/git/builds/' . rawurlencode($id));
     }
 
+    /** @return array<string, mixed> */
+    public function buildUsage(string $id, ?int $fromMs = null, ?int $toMs = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/git/builds/' . rawurlencode($id) . '/usage'
+                . $this->query(['from_ms' => $fromMs, 'to_ms' => $toMs]),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function buildUsageSamples(string $id, ?int $fromMs = null, ?int $toMs = null): array
+    {
+        return $this->request(
+            'GET',
+            '/api/v1/git/builds/' . rawurlencode($id) . '/usage/samples'
+                . $this->query(['from_ms' => $fromMs, 'to_ms' => $toMs]),
+        );
+    }
+
     // ------------------------------------------------------------- images
 
     /** @return array<int, array<string, mixed>> */
