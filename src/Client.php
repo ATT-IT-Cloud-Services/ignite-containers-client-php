@@ -1303,6 +1303,43 @@ final class Client
         );
     }
 
+    /**
+     * Activate one existing revision with a cutover strategy.
+     *
+     * `hard` starts the revision in the background and switches at once after
+     * `wait_seconds` (0 = immediate); `gradual` moves traffic through `steps`
+     * (increasing, last 100), each after `step_seconds`. The same call rolls back
+     * to an older revision.
+     *
+     * @param  list<int>|null  $steps
+     * @return array<string, mixed>
+     */
+    public function activateRevision(
+        string $podId,
+        string $revisionId,
+        string $mode = 'gradual',
+        ?array $steps = null,
+        ?int $stepSeconds = null,
+        ?int $waitSeconds = null,
+    ): array {
+        $body = ['mode' => $mode];
+        if ($steps !== null) {
+            $body['steps'] = $steps;
+        }
+        if ($stepSeconds !== null) {
+            $body['step_seconds'] = $stepSeconds;
+        }
+        if ($waitSeconds !== null) {
+            $body['wait_seconds'] = $waitSeconds;
+        }
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/revisions/' . rawurlencode($revisionId) . '/activate',
+            $body,
+        );
+    }
+
     /** @return array<string, mixed>|null */
     public function getRollout(string $podId): ?array
     {
