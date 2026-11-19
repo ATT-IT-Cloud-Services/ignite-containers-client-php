@@ -7,7 +7,7 @@ namespace IgniteContainers;
 /**
  * Minimal, dependency-free client for the Ignite Containers control plane.
  *
- *   $client = new \IgniteContainers\Client('https://games.example.com', getenv('IGNITE_CONTAINERS_API_KEY'));
+ *   $client = new \IgniteContainers\Client('https://api.example.com', getenv('IGNITE_CONTAINERS_API_KEY'));
  *   $pods = $client->listPods(['limit' => 10]);
  *
  * All methods either return the decoded JSON (array) or throw ClientException.
@@ -929,6 +929,34 @@ final class Client
     }
 
     /** @return array<int, array<string, mixed>> */
+    public function listRelays(): array
+    {
+        return $this->request('GET', '/api/v1/relays')['relays'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function createRelay(array $request): array
+    {
+        return $this->request('POST', '/api/v1/relays', $request);
+    }
+
+    public function getRelay(string $id): array
+    {
+        return $this->request('GET', '/api/v1/relays/' . rawurlencode($id));
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateRelay(string $id, array $request): array
+    {
+        return $this->request('PATCH', '/api/v1/relays/' . rawurlencode($id), $request);
+    }
+
+    public function deleteRelay(string $id): void
+    {
+        $this->request('DELETE', '/api/v1/relays/' . rawurlencode($id));
+    }
+
+    /** @return array<int, array<string, mixed>> */
     public function listListeners(): array
     {
         return $this->request('GET', '/api/v1/proxy/listeners')['listeners'];
@@ -1272,6 +1300,43 @@ final class Client
             '/api/v1/pods/' . rawurlencode($podId)
                 . '/revisions/' . rawurlencode($revisionId) . '/pin',
             ['pinned' => $pinned],
+        );
+    }
+
+    /**
+     * Activate one existing revision with a cutover strategy.
+     *
+     * `hard` starts the revision in the background and switches at once after
+     * `wait_seconds` (0 = immediate); `gradual` moves traffic through `steps`
+     * (increasing, last 100), each after `step_seconds`. The same call rolls back
+     * to an older revision.
+     *
+     * @param  list<int>|null  $steps
+     * @return array<string, mixed>
+     */
+    public function activateRevision(
+        string $podId,
+        string $revisionId,
+        string $mode = 'gradual',
+        ?array $steps = null,
+        ?int $stepSeconds = null,
+        ?int $waitSeconds = null,
+    ): array {
+        $body = ['mode' => $mode];
+        if ($steps !== null) {
+            $body['steps'] = $steps;
+        }
+        if ($stepSeconds !== null) {
+            $body['step_seconds'] = $stepSeconds;
+        }
+        if ($waitSeconds !== null) {
+            $body['wait_seconds'] = $waitSeconds;
+        }
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/revisions/' . rawurlencode($revisionId) . '/activate',
+            $body,
         );
     }
 
