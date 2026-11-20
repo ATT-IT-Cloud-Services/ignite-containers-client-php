@@ -1213,6 +1213,17 @@ final class Client
         );
     }
 
+    /** @param array<string, mixed> $request */
+    public function movePodForward(string $podId, string $forwardId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/forwards/' . rawurlencode($forwardId) . '/move',
+            $request,
+        );
+    }
+
     public function deletePodForward(string $podId, string $forwardId): void
     {
         $this->request(
@@ -1957,6 +1968,17 @@ final class Client
             'GET',
             '/api/v1/pods/' . rawurlencode($podId) . '/ports/history',
         )['events'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function movePodPort(string $podId, string $portId, array $request): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/pods/' . rawurlencode($podId)
+                . '/ports/' . rawurlencode($portId) . '/move',
+            $request,
+        );
     }
 
     public function deletePodPort(string $podId, string $portId): void
