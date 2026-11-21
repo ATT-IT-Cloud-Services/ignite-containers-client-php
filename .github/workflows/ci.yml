@@ -8,11 +8,26 @@ permissions:
   contents: read
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: leaseweb
+    env:
+      PHP_VERSION: 8.3.32
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.3"
+      # setup-php needs passwordless sudo, which the self-hosted runner does not
+      # grant. A static PHP build is self-contained, so use that instead.
+      - name: Install PHP
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64) arch=x86_64 ;;
+            aarch64|arm64) arch=aarch64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/php"
+          curl -fsSL \
+            "https://dl.static-php.dev/static-php-cli/common/php-${PHP_VERSION}-cli-linux-${arch}.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/php"
+          echo "$RUNNER_TEMP/php" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/php/php" -v
       - name: Lint
         run: find src -name "*.php" -print0 | xargs -0 -n1 php -l
