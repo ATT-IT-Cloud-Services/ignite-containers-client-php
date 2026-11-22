@@ -800,6 +800,27 @@ final class Client
         return $this->request('GET', '/api/v1/proxy/status');
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function listProxyNodes(): array
+    {
+        return $this->request('GET', '/api/v1/proxy/nodes')['nodes'];
+    }
+
+    /** @param array<string, mixed> $request */
+    public function upsertProxyNode(string $nodeId, array $request): array
+    {
+        return $this->request(
+            'PUT',
+            '/api/v1/proxy/nodes/' . rawurlencode($nodeId),
+            $request,
+        );
+    }
+
+    public function deleteProxyNode(string $nodeId): array
+    {
+        return $this->request('DELETE', '/api/v1/proxy/nodes/' . rawurlencode($nodeId));
+    }
+
     /** @return array<string, mixed> */
     public function reconcileProxy(): array
     {
@@ -973,6 +994,12 @@ final class Client
         $this->request('DELETE', '/api/v1/proxy/listeners/' . rawurlencode($id));
     }
 
+    /** @param array<string, mixed> $request */
+    public function updateListener(string $id, array $request): array
+    {
+        return $this->request('PATCH', '/api/v1/proxy/listeners/' . rawurlencode($id), $request);
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function listListenerRoutes(string $id): array
     {
@@ -988,6 +1015,16 @@ final class Client
         return $this->request(
             'POST',
             '/api/v1/proxy/listeners/' . rawurlencode($id) . '/routes',
+            $request,
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    public function updateListenerRoute(string $id, string $routeId, array $request): array
+    {
+        return $this->request(
+            'PATCH',
+            '/api/v1/proxy/listeners/' . rawurlencode($id) . '/routes/' . rawurlencode($routeId),
             $request,
         );
     }
