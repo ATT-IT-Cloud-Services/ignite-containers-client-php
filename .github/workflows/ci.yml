@@ -9,6 +9,7 @@ permissions:
 jobs:
   lint:
     runs-on: leaseweb
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     env:
       PHP_VERSION: 8.3.32
     steps:
