@@ -8,13 +8,13 @@ permissions:
   contents: read
 jobs:
   lint:
-    runs-on: leaseweb
+    runs-on: ubuntu-latest
     env:
       PHP_VERSION: 8.3.32
     steps:
       - uses: actions/checkout@v4
-      # setup-php needs passwordless sudo, which the self-hosted runner does not
-      # grant. A static PHP build is self-contained, so use that instead.
+      # Use a static PHP build so the lint job does not depend on the runner
+      # image's package manager.
       - name: Install PHP
         run: |
           set -euo pipefail
